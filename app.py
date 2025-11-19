@@ -3,39 +3,37 @@ import pandas as pd
 import difflib
 from io import BytesIO
 
-# Función para detectar y extraer cambios (reemplazos, inserciones, eliminaciones)
+# Función para detectar cambios con posiciones
 def get_changes(original, modified):
-    orig_tokens = original.lower().split()
-    mod_tokens = modified.lower().split()
-    matcher = difflib.SequenceMatcher(None, orig_tokens, mod_tokens)
+    matcher = difflib.SequenceMatcher(None, original, modified)
     changes = []
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
         if tag == 'replace':
-            old_phrase = ' '.join(orig_tokens[i1:i2])
-            new_phrase = ' '.join(mod_tokens[j1:j2])
-            changes.append(('replace', old_phrase, new_phrase))
+            changes.append(('replace', i1, i2, modified[j1:j2]))
         elif tag == 'delete':
-            old_phrase = ' '.join(orig_tokens[i1:i2])
-            changes.append(('delete', old_phrase, ''))
+            changes.append(('delete', i1, i2, ''))
         elif tag == 'insert':
-            new_phrase = ' '.join(mod_tokens[j1:j2])
-            changes.append(('insert', '', new_phrase))  # Nota: inserción requiere contexto, se aplica al final o inicio aproximado
+            changes.append(('insert', i1, i1, modified[j1:j2]))
     return changes
 
-# Función para aplicar cambios a otra descripción
+# Función para aplicar cambios con posiciones
 def apply_changes(desc, changes):
-    desc_lower = desc.lower()
-    updated_desc = desc
-    for change_type, old_phrase, new_phrase in changes:
-        if change_type == 'replace' and old_phrase in desc_lower:
-            # Reemplaza la primera ocurrencia
-            updated_desc = updated_desc.replace(old_phrase, new_phrase, 1)
-        elif change_type == 'delete' and old_phrase in desc_lower:
-            updated_desc = updated_desc.replace(old_phrase, '', 1)
-        elif change_type == 'insert':
-            # Inserta al final (aproximación simple; en producción, podría necesitar lógica de posición)
-            updated_desc += ' ' + new_phrase
-    return updated_desc.strip()
+    result = desc
+    offset = 0
+    for change in changes:
+        tag, start, end, new_text = change
+        start += offset
+        end += offset
+        if tag == 'replace':
+            result = result[:start] + new_text + result[end:]
+            offset += len(new_text) - (end - start)
+        elif tag == 'delete':
+            result = result[:start] + result[end:]
+            offset -= (end - start)
+        elif tag == 'insert':
+            result = result[:start] + new_text + result[start:]
+            offset += len(new_text)
+    return result
 
 # Carga inicial del Excel (fuerza id como string, agrega columnas de seguimiento si no existen)
 @st.cache_data
@@ -90,7 +88,7 @@ def main():
         # Detecta cambios
         changes = get_changes(original_desc, new_description)
         if changes:
-            st.info(f"Cambios detectados: {changes}. Aplicando a descripciones que contengan las frases.")
+            st.info(f"Cambios detectados: {len(changes)} operaciones. Aplicando a descripciones que contengan las frases.")
             
             # Aplica a todas las filas (excepto la actual)
             for idx in df.index:
