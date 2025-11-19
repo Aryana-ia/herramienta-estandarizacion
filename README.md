@@ -1,1 +1,0 @@
-# herramienta-estandarizacion
