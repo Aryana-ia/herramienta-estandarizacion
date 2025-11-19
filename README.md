@@ -5,9 +5,10 @@ Esta herramienta permite estandarizar descripciones de productos de manera inter
 ## Características
 - Carga de datos desde un archivo Excel (.xlsx).
 - Edición interactiva de descripciones.
-- Detección automática de cambios usando `difflib`.
+- Detección automática de cambios usando `difflib` para comparaciones precisas.
 - Propagación de cambios a filas que contengan frases similares.
 - Respeta IDs con ceros iniciales (tratados como strings).
+- Seguimiento de modificaciones: columna para indicar si fue modificada y cuántas veces.
 - Descarga del archivo Excel actualizado con cambios aplicados.
 - Vista previa de cambios aplicados.
 

@@ -4,7 +4,6 @@ import difflib
 from io import BytesIO
 
 # Función para detectar y extraer cambios (reemplazos, inserciones, eliminaciones)
-# Usa split() en lugar de nltk para evitar problemas de descarga
 def get_changes(original, modified):
     orig_tokens = original.lower().split()
     mod_tokens = modified.lower().split()
@@ -38,10 +37,16 @@ def apply_changes(desc, changes):
             updated_desc += ' ' + new_phrase
     return updated_desc.strip()
 
-# Carga inicial del Excel (fuerza id como string)
+# Carga inicial del Excel (fuerza id como string, agrega columnas de seguimiento si no existen)
 @st.cache_data
 def load_data():
-    return pd.read_excel('descripciones.xlsx', dtype={'id': str})
+    df = pd.read_excel('descripciones.xlsx', dtype={'id': str})
+    # Agrega columnas de seguimiento si no existen
+    if 'modificado' not in df.columns:
+        df['modificado'] = False
+    if 'veces_modificado' not in df.columns:
+        df['veces_modificado'] = 0
+    return df
 
 # Guarda el DataFrame actualizado en Excel
 def save_data(df):
@@ -73,6 +78,8 @@ def main():
     st.write(f"**Tienda:** {current_row['tienda']}")
     st.write(f"**Descripción Original:** {current_row['descripcion_original']}")
     st.write(f"**Descripción Modificada Actual:** {current_row['descripcion_modificada']}")
+    st.write(f"**Modificado:** {current_row['modificado']}")
+    st.write(f"**Veces Modificado:** {current_row['veces_modificado']}")
     
     # Campo de edición
     new_description = st.text_area("Edita la descripción modificada:", value=current_row['descripcion_modificada'])
@@ -90,12 +97,18 @@ def main():
                 if idx != row_index:
                     desc = df.at[idx, 'descripcion_modificada']
                     updated_desc = apply_changes(desc, changes)
-                    df.at[idx, 'descripcion_modificada'] = updated_desc
+                    if updated_desc != desc:  # Si cambió, marca como modificado
+                        df.at[idx, 'descripcion_modificada'] = updated_desc
+                        df.at[idx, 'modificado'] = True
+                        df.at[idx, 'veces_modificado'] += 1
         else:
             st.warning("No se detectaron cambios. Aplicando solo a esta fila.")
         
         # Actualiza la fila editada
-        df.at[row_index, 'descripcion_modificada'] = new_description
+        if new_description != original_desc:
+            df.at[row_index, 'descripcion_modificada'] = new_description
+            df.at[row_index, 'modificado'] = True
+            df.at[row_index, 'veces_modificado'] += 1
         
         # Guarda cambios
         save_data(df)
@@ -104,7 +117,7 @@ def main():
         # Muestra preview de cambios
         st.write("Vista previa de filas afectadas (solo primeras 5):")
         affected = df[df.index != row_index] if changes else df.iloc[[row_index]]
-        st.dataframe(affected[['id', 'descripcion_original', 'descripcion_modificada']].head(5))
+        st.dataframe(affected[['id', 'descripcion_original', 'descripcion_modificada', 'modificado', 'veces_modificado']].head(5))
 
     # Botón de descarga del Excel actualizado
     st.write("---")
