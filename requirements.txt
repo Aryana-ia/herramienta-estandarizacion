@@ -2,3 +2,4 @@ streamlit
 pandas
 nltk
 openpyxl
+difflib
