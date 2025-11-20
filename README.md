@@ -1,12 +1,12 @@
 # Herramienta de Estandarización de Descripciones
 
-Esta herramienta permite estandarizar descripciones de productos de manera interactiva usando Streamlit. Permite editar una descripción y propagar automáticamente cualquier cambio (reemplazos, inserciones, eliminaciones, movimientos de palabras) a otras descripciones que contengan las frases afectadas.
+Esta herramienta permite estandarizar descripciones de productos de manera interactiva usando Streamlit. Permite editar una descripción y propagar automáticamente cualquier cambio (reemplazos, inserciones, eliminaciones, movimientos de palabras) a otras descripciones similares que contengan las frases afectadas.
 
 ## Características
 - Carga de datos desde un archivo Excel (.xlsx).
 - Edición interactiva de descripciones.
-- Detección automática de cambios usando `difflib` para comparaciones precisas.
-- Propagación de cambios a filas que contengan frases similares.
+- Detección automática de cambios usando `difflib` para identificar frases cambiadas.
+- Propagación de cambios solo a descripciones con similitud > 70% (para evitar corrupciones).
 - Respeta IDs con ceros iniciales (tratados como strings).
 - Seguimiento de modificaciones: columna para indicar si fue modificada y cuántas veces.
 - Descarga del archivo Excel actualizado con cambios aplicados.
@@ -33,5 +33,5 @@ Esta herramienta permite estandarizar descripciones de productos de manera inter
 
 ## Notas
 - Para archivos grandes (20,000 filas), considera usar una base de datos en lugar de Excel.
-- La propagación se basa en coincidencias exactas de frases; para similitudes avanzadas, se puede mejorar con bibliotecas adicionales.
+- La propagación se basa en similitud y coincidencias exactas de frases; ajusta el umbral si es necesario.
 - Los cambios se aplican en memoria; descarga el Excel para guardar permanentemente.

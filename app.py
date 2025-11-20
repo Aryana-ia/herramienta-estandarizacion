@@ -3,36 +3,34 @@ import pandas as pd
 import difflib
 from io import BytesIO
 
-# Función para detectar cambios con posiciones
+# Función para detectar cambios y extraer frases
 def get_changes(original, modified):
     matcher = difflib.SequenceMatcher(None, original, modified)
     changes = []
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        old_phrase = original[i1:i2]
+        new_phrase = modified[j1:j2]
         if tag == 'replace':
-            changes.append(('replace', i1, i2, modified[j1:j2]))
+            changes.append(('replace', old_phrase, new_phrase))
         elif tag == 'delete':
-            changes.append(('delete', i1, i2, ''))
+            changes.append(('delete', old_phrase, ''))
         elif tag == 'insert':
-            changes.append(('insert', i1, i1, modified[j1:j2]))
+            changes.append(('insert', '', new_phrase))
     return changes
 
-# Función para aplicar cambios con posiciones
-def apply_changes(desc, changes):
+# Función para aplicar cambios mediante reemplazos simples, solo si similitud > umbral
+def apply_changes(desc, changes, original_desc, similarity_threshold=0.7):
+    ratio = difflib.SequenceMatcher(None, original_desc, desc).ratio()
+    if ratio < similarity_threshold:
+        return desc  # No aplicar si no es similar
     result = desc
-    offset = 0
-    for change in changes:
-        tag, start, end, new_text = change
-        start += offset
-        end += offset
-        if tag == 'replace':
-            result = result[:start] + new_text + result[end:]
-            offset += len(new_text) - (end - start)
-        elif tag == 'delete':
-            result = result[:start] + result[end:]
-            offset -= (end - start)
+    for tag, old_phrase, new_phrase in changes:
+        if tag == 'replace' and old_phrase in result:
+            result = result.replace(old_phrase, new_phrase)
+        elif tag == 'delete' and old_phrase in result:
+            result = result.replace(old_phrase, '')
         elif tag == 'insert':
-            result = result[:start] + new_text + result[start:]
-            offset += len(new_text)
+            result = new_phrase + result  # Agrega al inicio para inserciones
     return result
 
 # Carga inicial del Excel (fuerza id como string, agrega columnas de seguimiento si no existen)
@@ -61,7 +59,7 @@ def to_excel(df):
 # Función principal
 def main():
     st.title("Herramienta de Estandarización de Descripciones (con Propagación de Cualquier Cambio)")
-    st.write("Edita una descripción; cualquier cambio (posición, contenido, etc.) se aplicará automáticamente a otras descripciones que contengan las frases afectadas.")
+    st.write("Edita una descripción; cualquier cambio se aplicará automáticamente a descripciones similares (>70% similitud) que contengan las frases afectadas.")
     
     # Carga datos
     df = load_data()
@@ -88,13 +86,13 @@ def main():
         # Detecta cambios
         changes = get_changes(original_desc, new_description)
         if changes:
-            st.info(f"Cambios detectados: {len(changes)} operaciones. Aplicando a descripciones que contengan las frases.")
+            st.info(f"Cambios detectados: {changes}. Aplicando a descripciones similares (>70%).")
             
             # Aplica a todas las filas (excepto la actual)
             for idx in df.index:
                 if idx != row_index:
                     desc = df.at[idx, 'descripcion_modificada']
-                    updated_desc = apply_changes(desc, changes)
+                    updated_desc = apply_changes(desc, changes, original_desc)
                     if updated_desc != desc:  # Si cambió, marca como modificado
                         df.at[idx, 'descripcion_modificada'] = updated_desc
                         df.at[idx, 'modificado'] = True
